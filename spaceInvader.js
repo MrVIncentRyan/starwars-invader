@@ -11,6 +11,7 @@ function spaceInvader (window, canvas) {
         this.message = '';
         this.rebel = [];
         this.republic = [];
+        this.other = [];
         this.size = {x: canvas.width, y: canvas.height};
         this.wave = 0;
 
@@ -52,7 +53,7 @@ function spaceInvader (window, canvas) {
         }
     };
     Game.prototype.computeElements = function () {
-        this.elements = this.republic.concat(this.rebel);
+        this.elements = this.other.concat(this.republic, this.rebel);
     };
     Game.prototype.addRebel = function (element) {
         this.rebel.push(element);
@@ -60,16 +61,23 @@ function spaceInvader (window, canvas) {
     Game.prototype.addRepublic = function (element) {
         this.republic.push(element);
     };
+    Game.prototype.addOther = function (element) {
+        this.other.push(element);
+    };
     Game.prototype.handleCollisions = function () {
         this.rebel.forEach(function(elementA) {
             this.republic.forEach(function (elementB) {
                 if (!Element.colliding(elementA, elementB)) return;
                 elementA.life--;
                 elementB.life--;
+                var sizeA = elementA.size.x * elementA.size.y;
+                var sizeB = elementB.size.x * elementB.size.y;
+                this.addOther(new Explosion(this, sizeA > sizeB ? elementA.pos : elementB.pos));
             }, this);
         }, this);
         this.republic = this.republic.filter(Element.isAlive);
         this.rebel = this.rebel.filter(Element.isAlive);
+        this.other = this.other.filter(Element.isAlive);
         this.republic = this.republic.filter(this.elementInGame, this);
         this.rebel = this.rebel.filter(this.elementInGame, this);
     };
@@ -251,7 +259,7 @@ function spaceInvader (window, canvas) {
     Alien.prototype.draw = function () {
         var img = document.getElementById('fighter');
         context.save();
-        context.translate(this.pos.x + this.halfWidth, this.pos.y);
+        context.translate(this.pos.x + this.halfWidth, this.pos.y + this.halfHeight);
         context.rotate(Math.PI);
         context.drawImage(img, 0, 0);
         context.restore();
@@ -264,6 +272,15 @@ function spaceInvader (window, canvas) {
         this.direction = direction;
         this.isRebel = isRebel;
         this.life = 1;
+
+        try {
+            var sound = document.getElementById('sound-raygun');
+            sound.load();
+            sound.play().then(function () {}, function () {});
+        }
+        catch (e) {
+            // only a sound issue
+        }
     }
     Bullet.SIZE = {x: 6, y: 20};
     Bullet.SPEED = 3;
@@ -273,12 +290,45 @@ function spaceInvader (window, canvas) {
     };
     Bullet.prototype.draw = function () {
         context.save();
-        context.translate(this.pos.x + this.halfWidth, this.pos.y - this.halfHeight);
-        var img = document.getElementById('rebel-bullet');
-        if (!this.isRebel) {
+        var img;
+        if (this.isRebel) {
+            context.translate(this.pos.x - this.halfWidth, this.pos.y - this.halfHeight);
+            img = document.getElementById('rebel-bullet');
+        }
+        else {
+            context.translate(this.pos.x + this.halfWidth, this.pos.y + this.halfHeight);
             img = document.getElementById('republic-bullet');
             context.rotate(Math.PI);
         }
+        context.drawImage(img, 0, 0);
+        context.restore();
+    };
+
+    /* EXPLOSION */
+
+    function Explosion(game, pos) {
+        Element.call(this, game, pos, Explosion.SIZE);
+        this.life = 1;
+        this.date = new Date();
+
+        try {
+            var sound = document.getElementById('sound-explosion');
+            sound.load();
+            sound.play().then(function () {}, function () {});
+        }
+        catch (e) {
+            // only a sound issue
+        }
+    }
+    Explosion.SIZE = {x: 115, y: 100};
+    Explosion.DURATION = 150;
+    Explosion.prototype.update = function () {
+        if (new Date() - this.date > Explosion.DURATION) this.life = 0;
+    };
+    Explosion.prototype.draw = function () {
+        var img = document.getElementById('explosion');
+        context.save();
+        context.translate(this.pos.x - this.halfWidth, this.pos.y - this.halfHeight);
         context.drawImage(img, 0, 0);
         context.restore();
     };
